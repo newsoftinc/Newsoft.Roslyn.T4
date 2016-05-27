@@ -1,0 +1,43 @@
+﻿<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ include file="NewsoftRoslyn.Dependencies.ttinclude" #>
+<#@ include file="NewsoftRoslyn.Helpers.ttinclude" #>
+<#@ include file="NewsoftRoslyn.VsProject.ttinclude" #>
+<#@ include file="NewsoftRoslyn.VsSolution.ttinclude" #>
+<#+
+public VsSolution GetVsSolution() 
+{
+	//Find the sln of our current solution
+	var path = GetSolutionFile();
+
+	var res = VsSolution.FromPath(path);
+
+	return res;
+}
+public string GetSolutionDirectory()
+{
+    var serviceProvider = this.Host as IServiceProvider;
+    var dte = serviceProvider.GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+    return System.IO.Path.GetDirectoryName(dte.Solution.FullName);
+}
+public string GetSolutionFile()
+{
+	var slnFile = new DirectoryInfo(GetSolutionDirectory()).GetFiles().Where(V=>V.Name.EndsWith(".sln")).FirstOrDefault();
+
+	return slnFile.FullName;
+}
+public string GetCurrentProjectName()
+{
+
+	var serviceProvider = this.Host as IServiceProvider;
+    var dte = serviceProvider.GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+
+	var res = GetActiveProject(dte).Name;
+
+	return res;
+
+}
+public EnvDTE.Project GetActiveProject(DTE dte)
+{
+	return dte.Solution.FindProjectItem(Host.TemplateFile).ContainingProject;
+}  
+#>

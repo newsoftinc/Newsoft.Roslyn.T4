@@ -1,0 +1,100 @@
+﻿<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ include file="NewsoftRoslyn.Dependencies.ttinclude" #>
+<#+
+    public class VsProject
+    {
+
+        public Microsoft.CodeAnalysis.Compilation Compilation { get; private set; }
+        public Microsoft.CodeAnalysis.Project Project { get; private set; }
+        public VsSolution VsSolution { get; private set; }
+
+        private VsProject(Microsoft.CodeAnalysis.Project project, VsSolution vsSolution)
+        {
+            Project = project;
+            VsSolution = vsSolution;
+        }
+
+        public IEnumerable<ISymbol> GetAllClass()
+        {
+            var res = Compilation.SyntaxTrees.Select(syntaxTree => Compilation.GetSemanticModel(syntaxTree)).SelectMany(
+                semanticModel => semanticModel
+                    .SyntaxTree
+                    .GetRoot()
+                    .DescendantNodes()
+                    .OfType<ClassDeclarationSyntax>()
+                    .Select(interfaceDeclarationSyntax => semanticModel.GetDeclaredSymbol(interfaceDeclarationSyntax)))
+
+            .ToList();
+
+
+            return res;
+        }
+        protected virtual async Task Init()
+        {
+            Compilation = await Project.GetCompilationAsync();
+        }
+        public static VsProject FromProjectName(string solutionPath, string projectName)
+        {
+            var task = FromProjectNameAsync(solutionPath, projectName);
+            task.Wait();
+
+            return task.Result;
+        }
+        public static async Task<VsProject> FromProjectNameAsync(string solutionPath, string projectName)
+        {
+            var sol = await VsSolution.FromPathAsync(solutionPath, new string[] { projectName });
+            var proj = await VsProject.FromProjectAsync(sol.Projects.Where(V => V.Project.Name == projectName).Select(V0 => V0.Project).FirstOrDefault(), sol);
+            return proj;
+        }
+        public static VsProject FromProject(Microsoft.CodeAnalysis.Project project, VsSolution vsSolution)
+        {
+            var task = FromProjectAsync(project, vsSolution);
+            task.Wait();
+
+            return task.Result;
+        }
+        public static async Task<VsProject> FromProjectAsync(Microsoft.CodeAnalysis.Project project, VsSolution vsSolution)
+        {
+            var vsProj = new VsProject(project, vsSolution);
+
+            await vsProj.Init();
+
+            return vsProj;
+        }
+        public IEnumerable<ISymbol> GetDeclarationSyntax<T>()
+            where T : TypeDeclarationSyntax
+        {
+            var res = GetDeclarationSyntaxMutable<T>()
+            .ToImmutableList();
+
+            return res;
+        }
+        public IEnumerable<ISymbol> GetDeclarationSyntaxMutable<T>()
+            where T : TypeDeclarationSyntax
+        {
+            var res = Compilation.SyntaxTrees.Select(syntaxTree => Compilation.GetSemanticModel(syntaxTree)).SelectMany(
+                semanticModel => semanticModel
+                    .SyntaxTree
+                    .GetRoot()
+                    .DescendantNodes()
+                    .OfType<T>()
+                    .Select(interfaceDeclarationSyntax => semanticModel.GetDeclaredSymbol(interfaceDeclarationSyntax)));
+
+            return res;
+        }
+
+        public string Ok()
+        {
+            return "asd";
+        }
+        public IEnumerable<INamedTypeSymbol> GetClassesImplementingInterface<TInterface>()
+        {
+            var res = GetDeclarationSyntax<ClassDeclarationSyntax>().Cast<INamedTypeSymbol>()
+                .Where(V => V
+                .AllInterfaces
+                    .Where(V0 => RoslynHelpers.GetFullMetadataName(V0) == typeof(TInterface).FullName).Any());
+
+            return res.ToImmutableList();
+        }
+    }
+#>

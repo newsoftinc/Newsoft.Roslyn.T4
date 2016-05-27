@@ -1,0 +1,63 @@
+﻿<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ include file="NewsoftRoslyn.Dependencies.ttinclude" #>
+<#+
+    public static class RoslynHelpers
+    {
+        public static List<ISymbol> GetMembersWithDescendants(INamedTypeSymbol symbol)
+        {
+            var members =new List<ISymbol>();
+            members.AddRange(symbol.GetMembers());
+
+            if (symbol.BaseType != null)
+            {
+                var desdendantMembers =RoslynHelpers.GetMembersWithDescendants(symbol.BaseType);
+                members.AddRange(desdendantMembers);
+            }
+
+            return members;
+        }
+
+        public static async Task<INamedTypeSymbol> GetClassProperties(VsSolution sln, INamedTypeSymbol symbol)
+        {
+            if (symbol.TypeKind != TypeKind.Class)
+                throw new InvalidOperationException("Provide a class symbol");
+
+
+            var fqmn = GetFullMetadataName(symbol);
+
+            var clsMeta = sln.Projects.Select(V => V.Compilation.GetTypeByMetadataName(fqmn));
+
+            return null;
+        }
+
+        public static string GetFullMetadataName( ISymbol symbol)
+        {
+            ISymbol s = symbol;
+            var sb = new StringBuilder(s.MetadataName);
+
+            var last = s;
+            s = s.ContainingSymbol;
+            while (!IsRootNamespace(s))
+            {
+                if (s is ITypeSymbol && last is ITypeSymbol)
+                {
+                    sb.Insert(0, '+');
+                }
+                else
+                {
+                    sb.Insert(0, '.');
+                }
+                sb.Insert(0, s.MetadataName);
+                s = s.ContainingSymbol;
+            }
+
+            return sb.ToString();
+        }
+
+        private static bool IsRootNamespace(ISymbol s)
+        {
+            return s is INamespaceSymbol && ((INamespaceSymbol)s).IsGlobalNamespace;
+        }
+
+    }
+#>

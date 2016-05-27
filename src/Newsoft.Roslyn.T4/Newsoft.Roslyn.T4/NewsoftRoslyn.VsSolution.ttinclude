@@ -1,0 +1,53 @@
+﻿<#@ template debug="true" hostspecific="true" language="C#" #>
+<#@ include file="NewsoftRoslyn.Dependencies.ttinclude" #>
+<#+
+	 public class VsSolution
+    {
+        public Microsoft.CodeAnalysis.Solution Solution { get; private set; }
+        public IEnumerable<VsProject> Projects { get; private set; }
+
+        public string SolutionPath { get; private set; }
+
+        public Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace Workspace { get; private set; }
+
+
+        private VsSolution(string solPath)
+        {
+            SolutionPath = solPath;
+
+        }
+
+        public static async Task<VsSolution> FromPathAsync(string solutionPath, string[] projectNames = null)
+        {
+            var vsSolution = new VsSolution(solutionPath);
+
+            await vsSolution.Init(projectNames);
+
+            return vsSolution;
+        }
+        public static VsSolution FromPath(string solutionPath, string[] projectNames = null)
+        {
+            var res = VsSolution.FromPathAsync(solutionPath, projectNames);
+            res.Wait();
+            return res.Result;
+        }
+        protected virtual async Task Init(string[] projectNames = null)
+        {
+            Workspace = MSBuildWorkspace.Create();
+            Solution = await Workspace.OpenSolutionAsync(SolutionPath);
+
+            var prj = Solution.Projects;
+            if (projectNames != null)
+                prj = prj.Where(V => projectNames.Contains(V.Name));
+
+            Projects = await Task.WhenAll(prj.Select(V => VsProject.FromProjectAsync(V, this)));
+
+        }
+
+        public VsProject GetProjectByName(string projectName)
+        {
+            var res = Projects.Where(V => V.Project.Name == projectName).FirstOrDefault();
+            return res;
+        }
+    }
+#>

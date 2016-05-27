@@ -1,0 +1,52 @@
+﻿<#@ template  debug="true" hostSpecific="true" #>
+<#@ output extension=".cs" #>
+<#@ Assembly Name="System.Core" #>
+<#@ Assembly Name="System.Windows.Forms" #>
+<#@ import namespace="System" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Diagnostics" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Collections" #>
+<#@ import namespace="System.Collections.Generic" #> 
+<#
+var hostServiceProvider = this.Host as IServiceProvider;
+
+	var path = GetSolutionFile();
+	var dte = hostServiceProvider.GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+	var projectName = GetActiveProject(dte).Name;
+
+	VsProject prj =  VsProject.FromProjectName(path,projectName);
+
+	var allClass = prj.GetAllClass();
+
+	var interfaces = prj.GetDeclarationSyntax<InterfaceDeclarationSyntax>();
+#>
+//Compiled solution <#=path#> with hosting project <#=projectName#>
+//Found <#=allClass.Count()#> classes in project 
+//Found <#=interfaces.Count()#> interfaces 
+
+<#foreach(INamedTypeSymbol cls in allClass){#>
+//***********************************************
+//*Class : <#=cls.Name#>
+// Has Property members :
+<#
+var properties = RoslynHelpers.GetMembersWithDescendants(cls).Where(V=>V.Kind == SymbolKind.Property);
+foreach(IPropertySymbol prop in properties) {
+var propFQN = RoslynHelpers.GetFullMetadataName(prop.Type);
+var propTypeSymbol = prop.Type as INamedTypeSymbol;
+#>
+//<#=prop.Name#> Of type <#=propTypeSymbol.ToString()#> <#=propTypeSymbol.IsGenericType ? "IsGeneric" : ""#>
+<#}#>
+//***********************************************
+//Has methods:
+<#
+var methods = RoslynHelpers.GetMembersWithDescendants(cls).Where(V=>V.Kind == SymbolKind.Method);
+foreach(IMethodSymbol method in methods) {
+#>
+//<#=method.Name#>
+<#}#>
+
+<#}#>
+
+
+<#@ include file="NewsoftRoslyn.Core.ttinclude" #>
